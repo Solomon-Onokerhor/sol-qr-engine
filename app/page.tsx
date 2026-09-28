@@ -16,6 +16,7 @@ const ADMIN_SECRET = 'sol-agency-2026'
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
 function extractReviewLink(input: string): string {
+  if (!input) return 'https://google.com' // Fallback for pre-printing
   if (input.includes('writereview') || input.includes('g.page/r')) return input
   const patterns = [
     /place_id=([^&]+)/,
@@ -52,10 +53,12 @@ export default function AdminDashboard() {
   }, [fetchCodes])
 
   const createCode = async () => {
-    if (!businessName || !googleUrl) return setError('Both fields are required.')
+    if (!businessName) return setError('Stand Name is required.')
     setError('')
     setLoading(true)
-    const reviewLink = extractReviewLink(googleUrl)
+    
+    // If no URL provided, it defaults to google.com so he can pre-print
+    const reviewLink = googleUrl ? extractReviewLink(googleUrl) : 'https://google.com'
     const alias = businessName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     
     const res = await fetch('/api/qrcodes', {
@@ -93,7 +96,7 @@ export default function AdminDashboard() {
     const canvas = document.getElementById(`qr-canvas-${alias}`) as HTMLCanvasElement
     if (!canvas) return
     const link = document.createElement('a')
-    link.download = `${alias}-high-res-qr.png`
+    link.download = `${alias}-pure-qr.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
   }
@@ -124,8 +127,8 @@ export default function AdminDashboard() {
       </div>
 
       <div className="bg-gray-800 rounded-xl p-5 mb-8">
-        <h2 className="font-semibold text-lg mb-1">➕ Add New Stand</h2>
-        <p className="text-gray-400 text-xs mb-4">Name your stand (e.g. stand-01) and paste their Google Maps link.</p>
+        <h2 className="font-semibold text-lg mb-1">➕ Add New Stand (Pre-Print Mode)</h2>
+        <p className="text-gray-400 text-xs mb-4">Just type "stand-01" and hit Generate. URL is optional.</p>
         {error && <p className="text-red-400 text-sm mb-3 bg-red-900/20 p-2 rounded">{error}</p>}
         <input
           className="w-full bg-gray-700 rounded-lg px-4 py-3 mb-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -135,7 +138,7 @@ export default function AdminDashboard() {
         />
         <input
           className="w-full bg-gray-700 rounded-lg px-4 py-3 mb-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Paste Google Maps or Review link"
+          placeholder="Optional: Google Maps URL (Leave blank to add later)"
           value={googleUrl}
           onChange={(e) => setGoogleUrl(e.target.value)}
         />
@@ -158,7 +161,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-2xl p-8 text-center" onClick={(e) => e.stopPropagation()}>
             <QRCodeSVG value={selectedQR.url} size={240} />
             <p className="text-gray-800 font-bold mt-4 text-lg">{selectedQR.name}</p>
-            <p className="text-gray-500 text-sm mt-1">Right-click image to copy, or download below.</p>
+            <p className="text-gray-500 text-sm mt-1">Right-click image to copy, or click download below.</p>
             <button className="mt-5 bg-gray-900 text-white px-6 py-2 rounded-full text-sm" onClick={() => setSelectedQR(null)}>Close</button>
           </div>
         </div>
@@ -182,7 +185,7 @@ export default function AdminDashboard() {
                     <span className="font-bold text-white text-lg">{name}</span>
                     <span className="text-xs bg-green-900 text-green-300 px-2 py-0.5 rounded-full">⭐ {code.scans} scans</span>
                   </div>
-                  <p className="text-blue-400 text-xs mt-0.5 font-mono cursor-pointer hover:text-blue-300" onClick={() => copyLink(qrUrl)}>/{code.alias} 📋</p>
+                  <p className="text-blue-400 text-xs mt-0.5 font-mono cursor-pointer hover:text-blue-300 inline-block p-1 bg-gray-900 rounded" onClick={() => copyLink(qrUrl)}>/{code.alias} 📋</p>
                   {editingId === code.id ? (
                     <div className="mt-3 flex gap-2">
                       <input
@@ -195,7 +198,12 @@ export default function AdminDashboard() {
                       <button onClick={() => setEditingId(null)} className="bg-gray-600 text-white px-3 py-2 rounded text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <p className="text-gray-400 text-xs mt-1 truncate">{code.target_url}</p>
+                    <div className="mt-2">
+                      <p className="text-gray-400 text-xs truncate">Target: {code.target_url}</p>
+                      {code.target_url === 'https://google.com' && (
+                        <span className="text-yellow-400 text-xs font-bold">⚠️ Placeholder URL (Needs updating)</span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <button onClick={() => setSelectedQR({ url: qrUrl, name })} className="flex-shrink-0 bg-white p-1.5 rounded-lg hover:scale-105 transition" title="View Full QR">
@@ -204,7 +212,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex gap-2 mt-3 pt-3 border-t border-gray-700">
                 <button onClick={() => { setEditingId(code.id); setEditUrl(code.target_url) }} className="flex-1 bg-gray-700 hover:bg-gray-600 text-sm py-2 rounded-lg transition">✏️ Change URL</button>
-                <button onClick={() => downloadQR(code.alias)} className="flex-1 bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 text-sm py-2 rounded-lg transition font-semibold">⬇️ Get High-Res QR</button>
+                <button onClick={() => downloadQR(code.alias)} className="flex-1 bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 text-sm py-2 rounded-lg transition font-semibold">⬇️ High-Res PNG</button>
                 <button onClick={() => deleteCode(code.id)} className="bg-red-900/40 hover:bg-red-900/60 text-red-400 text-sm px-4 py-2 rounded-lg transition">🗑️</button>
               </div>
             </div>
